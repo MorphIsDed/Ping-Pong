@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smoother Ping Pong Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: radial-gradient(circle, #003300, #006600);
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            background: linear-gradient(135deg, #000033, #000066);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+        }
+
+        #scoreBoard {
+            text-align: center;
+            color: white;
+            font-size: 18px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        #countdown {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 50px;
+            color: white;
+            font-weight: bold;
+            display: none;
+        }
+
+        button {
+            display: block;
+            margin: 10px auto;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        #startButton {
+            background-color: #00FF00;
+        }
+        #startButton:hover { background-color: #00CC00; }
+
+        #stopButton {
+            background-color: red;
+            display: none;
+        }
+        #stopButton:hover { background-color: darkred; }
+
+    </style>
+</head>
+<body>
+    <div>
+        <canvas id="pongCanvas" width="800" height="400"></canvas>
+        <div id="scoreBoard">Player 1: 0 | Player 2: 0</div>
+        <div id="countdown"></div>
+        <button id="startButton">Start Game</button>
+        <button id="stopButton">Stop Game</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("pongCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const paddleHeight = 100, paddleWidth = 10, ballRadius = 10;
+        let player1Y, player2Y, ball, gameStarted = false;
+        let player1Score = 0, player2Score = 0;
+        let keys = { w: false, s: false, ArrowUp: false, ArrowDown: false };
+
+        const countdownDiv = document.getElementById("countdown");
+
+        class Ball {
+            constructor() {
+                this.reset();
+            }
+
+            draw() {
+                ctx.fillStyle = "#FF4500";
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, ballRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            update() {
+                if (!gameStarted) return; // Don't move the ball during countdown
+
+                this.x += this.dx;
+                this.y += this.dy;
+
+                // Ball Collision with Top & Bottom Walls
+                if (this.y - ballRadius <= 0 || this.y + ballRadius >= canvas.height) {
+                    this.dy = -this.dy;
+                }
+
+                // Ball Collision with Paddles
+                if (
+                    this.x - ballRadius <= paddleWidth && this.y > player1Y && this.y < player1Y + paddleHeight
+                ) {
+                    this.dx = -this.dx;
+                    this.x = paddleWidth + ballRadius;
+                }
+
+                if (
+                    this.x + ballRadius >= canvas.width - paddleWidth &&
+                    this.y > player2Y &&
+                    this.y < player2Y + paddleHeight
+                ) {
+                    this.dx = -this.dx;
+                    this.x = canvas.width - paddleWidth - ballRadius;
+                }
+
+                // Scoring Conditions
+                if (this.x - ballRadius < 0) {
+                    player2Score++;
+                    updateScore();
+                    startCountdown();
+                }
+
+                if (this.x + ballRadius > canvas.width) {
+                    player1Score++;
+                    updateScore();
+                    startCountdown();
+                }
+
+                this.draw();
+            }
+
+            reset() {
+                this.x = canvas.width / 2;
+                this.y = canvas.height / 2;
+                this.dx = 0;  // Ball doesn't move until countdown finishes
+                this.dy = 0;
+            }
+
+            launch() {
+                this.dx = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 2 + 3);
+                this.dy = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 2 + 2);
+            }
+        }
+
+        function drawPaddle(x, y) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(x, y, paddleWidth, paddleHeight);
+        }
+
+        function movePaddles() {
+            if (keys["w"] && player1Y > 0) player1Y -= 6;
+            if (keys["s"] && player1Y < canvas.height - paddleHeight) player1Y += 6;
+            if (keys["ArrowUp"] && player2Y > 0) player2Y -= 6;
+            if (keys["ArrowDown"] && player2Y < canvas.height - paddleHeight) player2Y += 6;
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            movePaddles();
+            drawPaddle(0, player1Y);
+            drawPaddle(canvas.width - paddleWidth, player2Y);
+            ball.update();
+
+            requestAnimationFrame(update);
+        }
+
+        function updateScore() {
+            document.getElementById("scoreBoard").textContent = `Player 1: ${player1Score} | Player 2: ${player2Score}`;
+        }
+
+        function startCountdown() {
+            gameStarted = false;
+            countdownDiv.style.display = "block";
+
+            let count = 3;
+            countdownDiv.innerText = count;
+
+            let countdownInterval = setInterval(() => {
+                count--;
+                countdownDiv.innerText = count > 0 ? count : "GO!";
+
+                if (count < 0) {
+                    clearInterval(countdownInterval);
+                    countdownDiv.style.display = "none";
+                    gameStarted = true;
+                    ball.launch(); // Launch the ball after countdown
+                }
+            }, 1000);
+        }
+
+        function startGame() {
+            if (!gameStarted) {
+                player1Y = (canvas.height - paddleHeight) / 2;
+                player2Y = (canvas.height - paddleHeight) / 2;
+                ball = new Ball();
+                update();
+                startCountdown(); // Start game with countdown
+
+                document.getElementById("startButton").style.display = "none";
+                document.getElementById("stopButton").style.display = "block";
+            }
+        }
+
+        function stopGame() {
+            gameStarted = false;
+            document.getElementById("startButton").style.display = "block";
+            document.getElementById("stopButton").style.display = "none";
+        }
+
+        document.addEventListener("keydown", (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+        });
+
+        document.addEventListener("keyup", (e) => {
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+        });
+
+        document.getElementById("startButton").addEventListener("click", startGame);
+        document.getElementById("stopButton").addEventListener("click", stopGame);
+
+    </script>
+</body>
+</html>
